@@ -13,10 +13,18 @@ let package = Package(
         .library(name: "SQLiteKit", targets: ["SQLiteKit"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-nio.git", from: "2.65.0"),
-        .package(url: "https://github.com/vapor/sqlite-nio.git", from: "1.9.0"),
-        .package(url: "https://github.com/vapor/sql-kit.git", from: "3.29.3"),
-        .package(url: "https://github.com/vapor/async-kit.git", from: "1.19.0"),
+        // TODO: SM: Merge all dependencies and wait for proper versions before merging here
+        // Or alternatively, this can stay as a minimum as long as the upper-most dependencies have proper minimum dependencies.
+        // Or I can put in alternative minimum versions for wasm.
+        .package(url: "https://github.com/PassiveLogic/swift-nio.git", branch: "feat/swift-wasm-support"),
+        .package(url: "https://github.com/PassiveLogic/sqlite-nio.git", branch: "feat/swift-wasm-support"),
+        .package(url: "https://github.com/PassiveLogic/sql-kit.git", branch: "feat/swift-wasm-support"),
+        .package(url: "https://github.com/PassiveLogic/async-kit.git", branch: "feat/swift-wasm-support"),
+
+//        .package(url: "https://github.com/apple/swift-nio.git", from: "2.65.0"),
+//        .package(url: "https://github.com/vapor/sqlite-nio.git", from: "1.9.0"),
+//        .package(url: "https://github.com/vapor/sql-kit.git", from: "3.29.3"),
+//        .package(url: "https://github.com/vapor/async-kit.git", from: "1.19.0"),
     ],
     targets: [
         .target(

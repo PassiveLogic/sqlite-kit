@@ -5,7 +5,11 @@ import Foundation
 #endif
 import Logging
 import AsyncKit
+#if canImport(NIOAsyncIO)
+import NIOAsyncIO
+#elseif canImport(NIOPosix)
 import NIOPosix
+#endif
 import SQLiteNIO
 import NIOCore
 
@@ -16,7 +20,13 @@ public struct SQLiteConnectionSource: ConnectionPoolSource, Sendable {
     private let threadPool: NIOThreadPool
 
     private var connectionStorage: SQLiteConnection.Storage {
+        #if os(WASI)
+        // NOTE: File urls and paths cause runtime errors currently. Currently using
+        // in-memory connection for WASI targets.
+        .memory
+        #else
         .file(path: self.actualURL.absoluteString)
+        #endif
     }
     
     /// Create a new ``SQLiteConnectionSource``.
