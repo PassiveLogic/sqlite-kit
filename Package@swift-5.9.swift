@@ -18,7 +18,7 @@ let package = Package(
         // Or I can put in alternative minimum versions for wasm.
         .package(url: "https://github.com/PassiveLogic/swift-nio.git", branch: "feat/swift-wasm-support"),
         .package(url: "https://github.com/PassiveLogic/sqlite-nio.git", branch: "feat/swift-wasm-support"),
-        .package(url: "https://github.com/PassiveLogic/sql-kit.git", branch: "feat/swift-wasm-support"),
+        .package(url: "https://github.com/PassiveLogic/sql-kit.git", branch: "feat/khasmPAL"),
         .package(url: "https://github.com/PassiveLogic/async-kit.git", branch: "feat/swift-wasm-support"),
 
 //        .package(url: "https://github.com/apple/swift-nio.git", from: "2.65.0"),
