@@ -5,11 +5,21 @@ import Foundation
 #endif
 import Logging
 import AsyncKit
-#if canImport(NIOAsyncRuntime)
+// Use NIOPosix on every host platform and substitute NIOAsyncRuntime on
+// WASI. Static `os(WASI)` is the right gate:
+//   - `canImport(NIOAsyncRuntime)` matches on macOS / Linux too when the
+//     module is in the dep graph as a transitive, but its `AsyncThreadPool`
+//     is `@available(macOS 15, *)` and breaks consumers with older
+//     deployment targets.
+//   - `canImport(NIOPosix)` matches on WASI as a partial-module stub that
+//     doesn't actually expose `NIOThreadPool` there, so the import
+//     link-fails.
+#if os(WASI)
 import NIOAsyncRuntime
 public typealias NIOThreadPool = AsyncThreadPool
-#endif
+#else
 import NIOPosix
+#endif
 import SQLiteNIO
 import NIOCore
 
