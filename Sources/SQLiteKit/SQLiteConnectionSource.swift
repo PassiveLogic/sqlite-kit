@@ -1,3 +1,6 @@
+// The connection-pool source is built on AsyncKit/SwiftNIO/Foundation, none of which are part of the
+// NIO-free WASI build. WASI uses sqlite-nio's concrete async `SQLiteConnection` directly (no pool).
+#if !os(WASI)
 #if canImport(Darwin)
 import Foundation
 #else
@@ -97,3 +100,4 @@ fileprivate extension SQLiteConfiguration.Storage {
         }
     }
 }
+#endif // !os(WASI)

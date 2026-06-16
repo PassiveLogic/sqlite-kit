@@ -143,11 +143,15 @@ struct SQLiteDatabaseVersion: SQLDatabaseReportedVersion {
         Self.components(of: self.intValue).patch
     }
 
+    #if !hasFeature(Embedded)
+    // `as? Self` is a cast to a generic type, which Embedded Swift forbids. On embedded we fall back to
+    // the `SQLDatabaseReportedVersion` protocol's default `stringValue`-based comparison implementations.
+
     // See `SQLDatabaseReportedVersion.isEqual(to:)`.
     func isEqual(to otherVersion: any SQLDatabaseReportedVersion) -> Bool {
         (otherVersion as? Self).map { $0.intValue == self.intValue } ?? false
     }
-    
+
     // See `SQLDatabaseReportedVersion.isOlder(than:)`.
     func isOlder(than otherVersion: any SQLDatabaseReportedVersion) -> Bool {
         (otherVersion as? Self).map {
@@ -156,6 +160,7 @@ struct SQLiteDatabaseVersion: SQLDatabaseReportedVersion {
             (self.patchVersion < $0.patchVersion)))
         } ?? false
     }
+    #endif
 }
 
 /// Wraps a `SQLiteDatabase` with the `SQLDatabase` protocol.
@@ -173,12 +178,14 @@ struct SQLiteDatabaseVersion: SQLDatabaseReportedVersion {
     @usableFromInline
     let decoder: SQLiteDataDecoder
     
+    #if !os(WASI)
     // See `SQLDatabase.eventLoop`.
     @usableFromInline
     var eventLoop: any EventLoop {
         self.database.eventLoop
     }
-    
+    #endif
+
     // See `SQLDatabase.version`.
     @usableFromInline
     var version: (any SQLDatabaseReportedVersion)? {
@@ -209,6 +216,7 @@ struct SQLiteDatabaseVersion: SQLDatabaseReportedVersion {
         self.queryLogLevel = queryLogLevel
     }
     
+    #if !os(WASI)
     // See `SQLDatabase.execute(sql:_:)`.
     @usableFromInline
     func execute(
@@ -216,7 +224,7 @@ struct SQLiteDatabaseVersion: SQLDatabaseReportedVersion {
         _ onRow: @escaping @Sendable (any SQLRow) -> ()
     ) -> EventLoopFuture<Void> {
         let (sql, rawBinds) = self.serialize(query)
-        
+
         if let queryLogLevel = self.queryLogLevel {
             self.logger.log(level: queryLogLevel, "Executing query", metadata: ["sql": .string(sql), "binds": .array(rawBinds.map { .string("\($0)") })])
         }
@@ -227,13 +235,14 @@ struct SQLiteDatabaseVersion: SQLDatabaseReportedVersion {
         } catch {
             return self.eventLoop.makeFailedFuture(error)
         }
-        
+
         return self.database.query(
             sql,
             binds,
             { onRow($0.sql(decoder: self.decoder)) }
         )
     }
+    #endif
 
     // See `SQLDatabase.execute(sql:_:)`.
     @usableFromInline
@@ -242,9 +251,14 @@ struct SQLiteDatabaseVersion: SQLDatabaseReportedVersion {
         _ onRow: @escaping @Sendable (any SQLRow) -> ()
     ) async throws {
         let (sql, rawBinds) = self.serialize(query)
-        
+
         if let queryLogLevel = self.queryLogLevel {
+            // Embedded Swift has no reflection, so bound values cannot be string-interpolated for logging.
+            #if hasFeature(Embedded)
+            self.logger.log(level: queryLogLevel, "Executing query", metadata: ["sql": .string(sql)])
+            #else
             self.logger.log(level: queryLogLevel, "Executing query", metadata: ["sql": .string(sql), "binds": .array(rawBinds.map { .string("\($0)") })])
+            #endif
         }
 
         try await self.database.query(
@@ -253,7 +267,10 @@ struct SQLiteDatabaseVersion: SQLDatabaseReportedVersion {
             { onRow($0.sql(decoder: self.decoder)) }
         )
     }
-    
+
+    #if !hasFeature(Embedded)
+    // `withSession(_:)` is gated out of the embedded `SQLDatabase` protocol (it is a generic requirement
+    // and relies on the NIO-based `withConnection`, which is concrete-only on WASI).
     // See `SQLDatabase.withSession(_:)`.
     @usableFromInline
     func withSession<R>(_ closure: @escaping @Sendable (any SQLDatabase) async throws -> R) async throws -> R {
@@ -261,4 +278,5 @@ struct SQLiteDatabaseVersion: SQLDatabaseReportedVersion {
             try await closure($0.sql(encoder: self.encoder, decoder: self.decoder, queryLogLevel: self.queryLogLevel))
         }
     }
+    #endif
 }

@@ -1,4 +1,6 @@
+#if !os(WASI)
 import struct Foundation.UUID
+#endif
 
 /// Describes a configuration for an SQLite database connection.
 public struct SQLiteConfiguration: Sendable {
@@ -8,7 +10,11 @@ public struct SQLiteConfiguration: Sendable {
         ///
         /// See ``memory(identifier:)``.
         public static var memory: Self {
+            #if os(WASI) // Foundation.UUID is unavailable; derive a unique identifier from system randomness.
+            .memory(identifier: "memory-\(UInt64.random(in: .min ... .max))")
+            #else
             .memory(identifier: UUID().uuidString)
+            #endif
         }
 
         /// Specify an SQLite database stored in memory, using a given identifier string.
