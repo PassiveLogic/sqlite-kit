@@ -1,6 +1,9 @@
 // swift-tools-version:5.9
 import PackageDescription
 
+let nonWASIPlatforms: [Platform] = [.macOS, .macCatalyst, .iOS, .tvOS, .watchOS, .visionOS, .driverKit, .linux, .windows, .android, .openbsd]
+let wasiPlatform: [Platform] = [.wasi]
+
 let package = Package(
     name: "sqlite-kit",
     platforms: [
@@ -13,16 +16,22 @@ let package = Package(
         .library(name: "SQLiteKit", targets: ["SQLiteKit"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-nio.git", from: "2.65.0"),
-        .package(url: "https://github.com/vapor/sqlite-nio.git", from: "1.9.0"),
-        .package(url: "https://github.com/vapor/sql-kit.git", from: "3.29.3"),
-        .package(url: "https://github.com/vapor/async-kit.git", from: "1.19.0"),
+        // Local clones for the embedded-wasm port (see /Users/scottm/git/c34/EMBEDDED_WASM_NOTES.md)
+        .package(path: "../swift-nio"),
+        .package(path: "../sqlite-nio"),
+        .package(path: "../sql-kit"),
+        .package(path: "../async-kit"),
     ],
     targets: [
         .target(
             name: "SQLiteKit",
             dependencies: [
-                .product(name: "NIOFoundationCompat", package: "swift-nio"),
+                .product(name: "NIOCore", package: "swift-nio"),
+                // NIOFoundationCompat pulls in Foundation; unavailable on the embedded WASI target.
+                .product(name: "NIOFoundationCompat", package: "swift-nio", condition: .when(platforms: nonWASIPlatforms)),
+                // On WASI use the async-await event loop; elsewhere NIOPosix.
+                .product(name: "NIOAsyncRuntime", package: "swift-nio", condition: .when(platforms: wasiPlatform)),
+                .product(name: "NIOPosix", package: "swift-nio", condition: .when(platforms: nonWASIPlatforms)),
                 .product(name: "AsyncKit", package: "async-kit"),
                 .product(name: "SQLiteNIO", package: "sqlite-nio"),
                 .product(name: "SQLKit", package: "sql-kit"),
