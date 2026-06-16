@@ -26,13 +26,14 @@ let package = Package(
         .target(
             name: "SQLiteKit",
             dependencies: [
-                .product(name: "NIOCore", package: "swift-nio"),
-                // NIOFoundationCompat pulls in Foundation; unavailable on the embedded WASI target.
+                // The SwiftNIO stack and async-kit's connection pool are elided on WASI (both normal
+                // and Embedded WASI). `.when(platforms:)` is target-evaluated, so these products are
+                // simply not built when cross-compiling to wasm32-unknown-wasip1; the WASI path is
+                // NIO-free (Swift Concurrency), gated in source with `#if os(WASI)`.
+                .product(name: "NIOCore", package: "swift-nio", condition: .when(platforms: nonWASIPlatforms)),
                 .product(name: "NIOFoundationCompat", package: "swift-nio", condition: .when(platforms: nonWASIPlatforms)),
-                // On WASI use the async-await event loop; elsewhere NIOPosix.
-                .product(name: "NIOAsyncRuntime", package: "swift-nio", condition: .when(platforms: wasiPlatform)),
                 .product(name: "NIOPosix", package: "swift-nio", condition: .when(platforms: nonWASIPlatforms)),
-                .product(name: "AsyncKit", package: "async-kit"),
+                .product(name: "AsyncKit", package: "async-kit", condition: .when(platforms: nonWASIPlatforms)),
                 .product(name: "SQLiteNIO", package: "sqlite-nio"),
                 .product(name: "SQLKit", package: "sql-kit"),
             ],
