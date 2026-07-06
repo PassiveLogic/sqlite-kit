@@ -1,3 +1,31 @@
+#if hasFeature(Embedded)
+import SQLKit
+import SQLiteNIO
+
+/// Translates a bound query parameter (a ``SQLKit/SQLBindValue``) into an `SQLiteData` value.
+///
+/// The Codable/JSON path used on normal platforms is unavailable in Embedded Swift, so on that target
+/// values are mapped directly from their driver-neutral ``SQLKit/SQLDataValue`` representation.
+public struct SQLiteDataEncoder: Sendable {
+    /// Initialize a ``SQLiteDataEncoder``.
+    public init() {}
+
+    /// Convert the given bound value to an `SQLiteData` value.
+    ///
+    /// - Parameter value: The value to convert.
+    /// - Returns: The converted `SQLiteData` value.
+    public func encode(_ value: any SQLBindValue & Sendable) throws -> SQLiteData {
+        switch value.sqlDataValue {
+        case .integer(let int): return .integer(SQLiteInt64(int))
+        case .double(let double): return .float(double)
+        case .string(let string): return .text(string)
+        case .blob(let bytes): return .blob(bytes)
+        case .bool(let bool): return .integer(bool ? 1 : 0)
+        case .null: return .null
+        }
+    }
+}
+#else
 import NIOCore
 import Foundation
 @_spi(CodableUtilities) import SQLKit
@@ -175,3 +203,4 @@ public struct SQLiteDataEncoder: Sendable {
         }
     }
 }
+#endif // hasFeature(Embedded)

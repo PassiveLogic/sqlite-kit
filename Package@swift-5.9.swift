@@ -1,5 +1,14 @@
 // swift-tools-version:5.9
+import class Foundation.ProcessInfo
 import PackageDescription
+
+// Embedded-wasm port (see /Users/scottm/git/c34/khasm/EMBEDDED_PORT_PLAN.md): with
+// KHASM_EMBEDDED=1 the SwiftNIO stack and AsyncKit's connection pool are dropped — the
+// Embedded build uses sqlite-nio's NIO-free Swift-Concurrency driver directly, gated in
+// source with `#if hasFeature(Embedded)` (not available in manifests, hence the env var,
+// matching khasm's own manifest gating). Regular builds — including regular WASI via
+// NIOAsyncRuntime — keep the NIO stack exactly as on the feat/khasmPAL-2026 base.
+let khasmEmbedded = ProcessInfo.processInfo.environment["KHASM_EMBEDDED"] == "1"
 
 let package = Package(
     name: "sqlite-kit",
@@ -13,28 +22,32 @@ let package = Package(
         .library(name: "SQLiteKit", targets: ["SQLiteKit"]),
     ],
     dependencies: [
-        // TODO: SM: Update swift-nio version once NIOAsyncRuntime is available from swift-nio
-        // .package(url: "https://github.com/apple/swift-nio.git", from: "2.89.0"),
+        // swift-nio / async-kit stay on the PassiveLogic fork URLs (feat/khasmPAL-2026, as on
+        // the base branch) rather than local clones: the local swift-nio clone carries the
+        // vestigial Option-1/2 embedded-NIO commits whose os(WASI) gates would change
+        // regular-WASI NIO behavior, and transitive *path* deps override URL declarations by
+        // identity in a consuming root graph (khasm). Under KHASM_EMBEDDED=1 both are dropped.
         .package(url: "https://github.com/PassiveLogic/swift-nio.git", branch: "feat/khasmPAL-2026"),
-
-        // TODO: SM: Update below once everything is merged and release to the proper repositories
-//        .package(url: "https://github.com/vapor/sqlite-nio.git", from: "1.9.0"),
-        .package(url: "https://github.com/PassiveLogic/sqlite-nio.git", branch: "feat/khasmPAL-2026"),
-        .package(url: "https://github.com/vapor/sql-kit.git", from: "3.33.1"),
-//        .package(url: "https://github.com/vapor/async-kit.git", from: "1.19.0"),
         .package(url: "https://github.com/PassiveLogic/async-kit.git", branch: "feat/khasmPAL-2026"),
+        // Local embedded-ported clones (see /Users/scottm/git/c34/EMBEDDED_WASM_NOTES.md),
+        // branched from the same revisions khasm's Package.resolved pins, so regular
+        // (non-embedded) builds see identical sources.
+        .package(path: "../sqlite-nio"),
+        .package(path: "../sql-kit"),
     ],
     targets: [
         .target(
             name: "SQLiteKit",
             dependencies: [
+                .product(name: "SQLiteNIO", package: "sqlite-nio"),
+                .product(name: "SQLKit", package: "sql-kit"),
+            ] + (khasmEmbedded ? [] : [
+                // Dropped on the Embedded build (KHASM_EMBEDDED=1, see note at the top).
                 .product(name: "NIOFoundationCompat", package: "swift-nio"),
                 .product(name: "NIOAsyncRuntime", package: "swift-nio", condition: .when(platforms: [.wasi])),
                 .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "AsyncKit", package: "async-kit"),
-                .product(name: "SQLiteNIO", package: "sqlite-nio"),
-                .product(name: "SQLKit", package: "sql-kit"),
-            ],
+            ]),
             swiftSettings: swiftSettings
         ),
         .testTarget(
