@@ -26,7 +26,9 @@ public struct SQLiteDataEncoder: Sendable {
     }
 }
 #else
+#if !NativeConcurrency
 import NIOCore
+#endif
 import Foundation
 @_spi(CodableUtilities) import SQLKit
 import SQLiteNIO

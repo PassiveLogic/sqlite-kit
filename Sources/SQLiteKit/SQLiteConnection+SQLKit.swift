@@ -178,7 +178,7 @@ struct SQLiteDatabaseVersion: SQLDatabaseReportedVersion {
     @usableFromInline
     let decoder: SQLiteDataDecoder
     
-    #if !hasFeature(Embedded)
+    #if !NativeConcurrency
     // See `SQLDatabase.eventLoop`.
     @usableFromInline
     var eventLoop: any EventLoop {
@@ -216,7 +216,7 @@ struct SQLiteDatabaseVersion: SQLDatabaseReportedVersion {
         self.queryLogLevel = queryLogLevel
     }
     
-    #if !hasFeature(Embedded)
+    #if !NativeConcurrency
     // See `SQLDatabase.execute(sql:_:)`.
     @usableFromInline
     func execute(
@@ -268,9 +268,9 @@ struct SQLiteDatabaseVersion: SQLDatabaseReportedVersion {
         )
     }
 
-    #if !hasFeature(Embedded)
-    // `withSession(_:)` is gated out of the embedded `SQLDatabase` protocol (it is a generic requirement
-    // and relies on the NIO-based `withConnection`, which is concrete-only on WASI).
+    #if !NativeConcurrency
+    // `withSession(_:)` rides sqlite-nio's protocol-level `withConnection`, which is concrete-only
+    // on the NativeConcurrency build (SQLKit's default `withSession` applies there instead).
     // See `SQLDatabase.withSession(_:)`.
     @usableFromInline
     func withSession<R>(_ closure: @escaping @Sendable (any SQLDatabase) async throws -> R) async throws -> R {

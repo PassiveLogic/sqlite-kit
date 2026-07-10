@@ -1,7 +1,7 @@
-// The connection-pool source is built on AsyncKit/SwiftNIO/Foundation, none of which are part of
-// the NIO-free Embedded build. Embedded uses sqlite-nio's concrete async `SQLiteConnection`
+// The connection-pool source is built on AsyncKit/SwiftNIO, which are not part of the NIO-free
+// NativeConcurrency build. That build uses sqlite-nio's concrete async `SQLiteConnection`
 // directly (no pool).
-#if !hasFeature(Embedded)
+#if !NativeConcurrency
 #if canImport(Darwin)
 import Foundation
 #else
@@ -121,4 +121,4 @@ fileprivate extension SQLiteConfiguration.Storage {
         }
     }
 }
-#endif // !hasFeature(Embedded)
+#endif // !NativeConcurrency
