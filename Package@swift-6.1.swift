@@ -33,13 +33,14 @@ let package = Package(
         // .package(url: "https://github.com/apple/swift-nio.git", from: "2.89.0"),
         .package(url: "https://github.com/PassiveLogic/swift-nio.git", branch: "feat/khasmPAL-2026"),
 
-        // TODO: SM: Update below once everything is merged and release to the proper repositories
-//        .package(url: "https://github.com/vapor/sqlite-nio.git", from: "1.9.0"),
-        .package(url: "https://github.com/PassiveLogic/sqlite-nio.git", branch: "feat/khasmPAL-2026", traits: [
+        // Local embedded-ported clones (see /Users/scottm/git/c34/EMBEDDED_WASM_NOTES.md),
+        // branched from the same revisions khasm's Package.resolved pins, so regular
+        // (non-embedded) builds see identical sources.
+        .package(path: "../sqlite-nio", traits: [
             .trait(name: "default", condition: .when(traits: ["NIO"])),
             .trait(name: "NativeConcurrency", condition: .when(traits: ["NativeConcurrency"])),
         ]),
-        .package(url: "https://github.com/vapor/sql-kit.git", from: "3.33.1", traits: [
+        .package(path: "../sql-kit", traits: [
             .trait(name: "default", condition: .when(traits: ["NIO"])),
             .trait(name: "NativeConcurrency", condition: .when(traits: ["NativeConcurrency"])),
         ]),
