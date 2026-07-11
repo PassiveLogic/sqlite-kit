@@ -1,7 +1,23 @@
+#if hasFeature(Embedded)
+import SQLiteNIO
+
+/// Placeholder ``SQLiteDataDecoder`` for the Embedded Swift build.
+///
+/// `Decodable`-based row decoding (the only thing this type does on normal platforms) is unavailable in
+/// Embedded Swift, where ``SQLKit/SQLRow`` exposes no generic `decode(column:as:)`. Typed access on
+/// embedded is performed directly against the concrete `SQLiteRow` via `SQLiteDataConvertible`. This
+/// stub exists only so the `SQLiteDataDecoder` API surface (e.g. `sql(decoder:)`) remains uniform.
+public struct SQLiteDataDecoder: Sendable {
+    /// Initialize a ``SQLiteDataDecoder``.
+    public init() {}
+}
+#else
 import Foundation
 import SQLiteNIO
 @_spi(CodableUtilities) import SQLKit
+#if !NativeConcurrency
 import NIOFoundationCompat
+#endif
 
 /// Translates `SQLiteData` values received from the database into `Decodable` values.
 ///
@@ -51,7 +67,11 @@ public struct SQLiteDataDecoder: Sendable {
                 
                 switch data {
                 case .text(let str):  buf = .init(str.utf8)
+                #if NativeConcurrency
+                case .blob(let blob): buf = .init(blob)
+                #else
                 case .blob(let blob): buf = .init(buffer: blob, byteTransferStrategy: .noCopy)
+                #endif
                 // The remaining cases should never happen, but we implement them anyway just in case.
                 case .integer(let n): buf = .init(String(n).utf8)
                 case .float(let n):   buf = .init(String(n).utf8)
@@ -109,3 +129,4 @@ public struct SQLiteDataDecoder: Sendable {
         }
     }
 }
+#endif // hasFeature(Embedded)

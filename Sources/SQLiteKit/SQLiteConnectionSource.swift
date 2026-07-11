@@ -1,3 +1,7 @@
+// The connection-pool source is built on AsyncKit/SwiftNIO, which are not part of the NIO-free
+// NativeConcurrency build. That build uses sqlite-nio's concrete async `SQLiteConnection`
+// directly (no pool).
+#if !NativeConcurrency
 #if canImport(Darwin)
 import Foundation
 #else
@@ -117,3 +121,4 @@ fileprivate extension SQLiteConfiguration.Storage {
         }
     }
 }
+#endif // !NativeConcurrency
