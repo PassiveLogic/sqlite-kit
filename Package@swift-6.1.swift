@@ -35,11 +35,12 @@ let package = Package(
 
         // TODO: SM: Update below once everything is merged and release to the proper repositories
 //        .package(url: "https://github.com/vapor/sqlite-nio.git", from: "1.9.0"),
-        .package(url: "https://github.com/PassiveLogic/sqlite-nio.git", branch: "feat/khasmPAL-2026", traits: [
+        .package(url: "https://github.com/PassiveLogic/sqlite-nio.git", branch: "feat/native-concurrency-trait", traits: [
             .trait(name: "default", condition: .when(traits: ["NIO"])),
             .trait(name: "NativeConcurrency", condition: .when(traits: ["NativeConcurrency"])),
         ]),
-        .package(url: "https://github.com/vapor/sql-kit.git", from: "3.33.1", traits: [
+//        .package(url: "https://github.com/vapor/sql-kit.git", from: "3.33.1"),
+        .package(url: "https://github.com/PassiveLogic/sql-kit.git", branch: "feat/native-concurrency-trait", traits: [
             .trait(name: "default", condition: .when(traits: ["NIO"])),
             .trait(name: "NativeConcurrency", condition: .when(traits: ["NativeConcurrency"])),
         ]),
