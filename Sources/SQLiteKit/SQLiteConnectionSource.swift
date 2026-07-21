@@ -5,7 +5,20 @@ import Foundation
 #endif
 import Logging
 import AsyncKit
+// Use NIOPosix on every host platform and substitute NIOAsyncRuntime on
+// WASI. Static `os(WASI)` is the right gate:
+//   - `canImport(NIOAsyncRuntime)` matches on macOS / Linux too when the
+//     module is in the dep graph as a transitive, but its types are
+//     `@available(macOS 15, *)` and break consumers with older deployment
+//     targets.
+//   - `canImport(NIOPosix)` matches on WASI as a partial-module stub that
+//     doesn't actually expose `NIOThreadPool` there, so the import
+//     link-fails.
+#if os(WASI)
+import NIOAsyncRuntime
+#else
 import NIOPosix
+#endif
 import SQLiteNIO
 import NIOCore
 
@@ -16,7 +29,13 @@ public struct SQLiteConnectionSource: ConnectionPoolSource, Sendable {
     private let threadPool: NIOThreadPool
 
     private var connectionStorage: SQLiteConnection.Storage {
+        #if os(WASI)
+        // NOTE: For WASI platforms, file urls and paths cause runtime errors currently. Using
+        // in-memory connection only as a workaround.
+        .memory
+        #else
         .file(path: self.actualURL.absoluteString)
+        #endif
     }
     
     /// Create a new ``SQLiteConnectionSource``.
