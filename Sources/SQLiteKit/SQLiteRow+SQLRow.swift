@@ -43,6 +43,9 @@ private struct SQLiteSQLRow: SQLRow {
         return data == .null
     }
 
+    // `SQLRow.decode(column:as:)` is gated out of the SQLKit protocol in Embedded Swift (generic
+    // requirement + Decodable).
+    #if !hasFeature(Embedded)
     // See `SQLRow.decode(column:as:)`.
     func decode<D: Decodable>(column: String, as: D.Type) throws -> D {
         guard let data = self.row.column(column) else {
@@ -50,6 +53,7 @@ private struct SQLiteSQLRow: SQLRow {
         }
         return try self.decoder.decode(D.self, from: data)
     }
+    #endif
 }
 
 /// A legacy deprecated conformance of `SQLiteRow` directly to `SQLRow`. This interface exists solely
@@ -68,6 +72,7 @@ extension SQLiteNIO.SQLiteRow: SQLKit.SQLRow {
     // See `SQLRow.decodeNil(column:)`.
     public func decodeNil(column: String) throws -> Bool { (self.column(column) ?? .null) == .null }
 
+    #if !hasFeature(Embedded)  // Decodable-based row decoding is unavailable in Embedded Swift.
     // See `SQLRow.decode(column:as:)`.
     public func decode<D: Decodable>(column: String, as: D.Type) throws -> D {
         guard let data = self.column(column) else { throw MissingColumn(column: column) }
@@ -87,4 +92,5 @@ extension SQLiteNIO.SQLiteRow: SQLKit.SQLRow {
 
     // See `SQLRow.decode(model:with:)`.
     public func decode<D: Decodable>(model: D.Type, with: SQLRowDecoder) throws -> D { try with.decode(D.self, from: self) }
+    #endif  // !hasFeature(Embedded)
 }

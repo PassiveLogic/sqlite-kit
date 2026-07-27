@@ -143,6 +143,9 @@ struct SQLiteDatabaseVersion: SQLDatabaseReportedVersion {
         Self.components(of: self.intValue).patch
     }
 
+    // `as? Self` is a cast to a generic type, which Embedded Swift does not support. There, the
+    // `SQLDatabaseReportedVersion` protocol's default `stringValue`-based implementations apply.
+    #if !hasFeature(Embedded)
     // See `SQLDatabaseReportedVersion.isEqual(to:)`.
     func isEqual(to otherVersion: any SQLDatabaseReportedVersion) -> Bool {
         (otherVersion as? Self).map { $0.intValue == self.intValue } ?? false
@@ -156,6 +159,7 @@ struct SQLiteDatabaseVersion: SQLDatabaseReportedVersion {
             (self.patchVersion < $0.patchVersion)))
         } ?? false
     }
+    #endif
 }
 
 /// Wraps a `SQLiteDatabase` with the `SQLDatabase` protocol.
@@ -250,7 +254,12 @@ struct SQLiteDatabaseVersion: SQLDatabaseReportedVersion {
         let (sql, rawBinds) = self.serialize(query)
         
         if let queryLogLevel = self.queryLogLevel {
+            #if hasFeature(Embedded)
+            // Embedded Swift has no reflection, so bound values cannot be interpolated for logging.
+            self.logger.log(level: queryLogLevel, "Executing query", metadata: ["sql": .string(sql)])
+            #else
             self.logger.log(level: queryLogLevel, "Executing query", metadata: ["sql": .string(sql), "binds": .array(rawBinds.map { .string("\($0)") })])
+            #endif
         }
 
         try await self.database.query(
