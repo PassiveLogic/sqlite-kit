@@ -173,11 +173,13 @@ struct SQLiteDatabaseVersion: SQLDatabaseReportedVersion {
     @usableFromInline
     let decoder: SQLiteDataDecoder
     
+    #if canImport(NIOCore)
     // See `SQLDatabase.eventLoop`.
     @usableFromInline
     var eventLoop: any EventLoop {
         self.database.eventLoop
     }
+    #endif
     
     // See `SQLDatabase.version`.
     @usableFromInline
@@ -209,6 +211,9 @@ struct SQLiteDatabaseVersion: SQLDatabaseReportedVersion {
         self.queryLogLevel = queryLogLevel
     }
     
+    // The `EventLoopFuture` overload only exists where SwiftNIO does; SQLKit's protocol drops the
+    // requirement on the other platforms and the `async` overload below carries the whole surface.
+    #if canImport(NIOCore)
     // See `SQLDatabase.execute(sql:_:)`.
     @usableFromInline
     func execute(
@@ -234,6 +239,7 @@ struct SQLiteDatabaseVersion: SQLDatabaseReportedVersion {
             { onRow($0.sql(decoder: self.decoder)) }
         )
     }
+    #endif  // canImport(NIOCore)
 
     // See `SQLDatabase.execute(sql:_:)`.
     @usableFromInline

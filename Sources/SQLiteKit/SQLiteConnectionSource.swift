@@ -1,3 +1,7 @@
+// ``SQLiteConnectionSource`` is a `ConnectionPoolSource`, built on AsyncKit and SwiftNIO's thread
+// pool. Neither is available on every platform SQLiteKit supports; where they are absent, callers
+// use sqlite-nio's concrete async `SQLiteConnection` directly and there is no pool.
+#if canImport(AsyncKit)
 #if canImport(Darwin)
 import Foundation
 #else
@@ -97,3 +101,4 @@ fileprivate extension SQLiteConfiguration.Storage {
         }
     }
 }
+#endif  // canImport(AsyncKit)
