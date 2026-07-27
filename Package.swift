@@ -1,6 +1,13 @@
 // swift-tools-version:5.8
 import PackageDescription
 
+/// `.when(platforms:)` can only include, never exclude, so excluding WASI means listing everything else.
+/// This list matches the [supported platforms on the Swift 5.8 release of SPM](https://github.com/swiftlang/swift-package-manager/blob/release/5.8/Sources/PackageDescription/SupportedPlatforms.swift);
+/// `.visionOS` arrived in SPM 5.9, and toolchains that know it read `Package@swift-5.9.swift` instead.
+/// Don't add new platforms here unless raising the swift-tools-version of this manifest.
+let allPlatforms: [Platform] = [.macOS, .macCatalyst, .iOS, .tvOS, .watchOS, .driverKit, .linux, .windows, .android, .wasi, .openbsd]
+let nonWASIPlatforms: [Platform] = allPlatforms.filter { $0 != .wasi }
+
 let package = Package(
     name: "sqlite-kit",
     platforms: [
@@ -22,8 +29,15 @@ let package = Package(
         .target(
             name: "SQLiteKit",
             dependencies: [
-                .product(name: "NIOFoundationCompat", package: "swift-nio"),
-                .product(name: "AsyncKit", package: "async-kit"),
+                // Target dependency conditions are evaluated per platform; on WASI these two
+                // products are not linked. AsyncKit's pool rides NIOPosix, which needs the POSIX
+                // sockets and threads WASI preview 1 lacks, and sqlite-nio's WASI flavor is
+                // SwiftNIO-free, so NIOFoundationCompat would have nothing to bridge and a linked
+                // NIOCore would flip the `#if canImport(NIOCore)` gates against a SQLiteNIO with no
+                // event loops. SQLiteKit then compiles without the connection pool and without the
+                // EventLoopFuture surface (see the `#if canImport(...)` gates in Sources/).
+                .product(name: "NIOFoundationCompat", package: "swift-nio", condition: .when(platforms: nonWASIPlatforms)),
+                .product(name: "AsyncKit", package: "async-kit", condition: .when(platforms: nonWASIPlatforms)),
                 .product(name: "SQLiteNIO", package: "sqlite-nio"),
                 .product(name: "SQLKit", package: "sql-kit"),
             ],
