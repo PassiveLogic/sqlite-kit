@@ -1,4 +1,5 @@
 // swift-tools-version:5.8
+import class Foundation.ProcessInfo
 import PackageDescription
 
 /// `.when(platforms:)` can only include, never exclude, so excluding WASI means listing everything else.
@@ -7,6 +8,22 @@ import PackageDescription
 /// Don't add new platforms here unless raising the swift-tools-version of this manifest.
 let allPlatforms: [Platform] = [.macOS, .macCatalyst, .iOS, .tvOS, .watchOS, .driverKit, .linux, .windows, .android, .wasi, .openbsd]
 let nonWASIPlatforms: [Platform] = allPlatforms.filter { $0 != .wasi }
+let wasiPlatform: [Platform] = [.wasi]
+
+// ┌────────────────────────────────────────────────────────────────────────────┐
+// │ DOWNSTREAM-ONLY — `integration/khasm-embedded`. NOT FOR UPSTREAM.             │
+// │ Must never be cherry-picked onto feat/wasi-nio-free or feat/embedded-support. │
+// └────────────────────────────────────────────────────────────────────────────┘
+//
+// Upstream elides SwiftNIO and AsyncKit for ALL of WASI, which deletes
+// ``SQLiteConnectionSource`` (and therefore any connection pool) there. khasm's REGULAR
+// wasm flavor cannot accept that: quantum-sqlite-driver builds its database on
+// `EventLoopConnectionPool<SQLiteConnectionSource>` + `NIOThreadPool` ungated. Only
+// khasm's Embedded/Freestanding flavor (KHASM_EMBEDDED=1) wants the upstream behavior,
+// so the WASI elision is scoped to that flavor; every other build keeps the full
+// surface, which makes the upstream `#if canImport(...)` gates inert.
+let khasmEmbedded = ProcessInfo.processInfo.environment["KHASM_EMBEDDED"] == "1"
+let nioPlatforms: [Platform] = khasmEmbedded ? nonWASIPlatforms : allPlatforms
 
 let package = Package(
     name: "sqlite-kit",
@@ -20,27 +37,42 @@ let package = Package(
         .library(name: "SQLiteKit", targets: ["SQLiteKit"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-nio.git", from: "2.65.0"),
+        // DOWNSTREAM-ONLY: the PassiveLogic forks of swift-nio and async-kit rather than the
+        // upstream URLs. khasm's root manifest pins both identities to those forks on a
+        // branch; when this manifest named the upstream URLs, SwiftPM canonicalized the
+        // identities onto them while keeping the root's branch requirement and then failed
+        // with `unable to read tree` on the fork-only revisions. The fork is also where
+        // NIOAsyncRuntime (the only wasm-capable EventLoopGroup) lives.
+        .package(url: "https://github.com/PassiveLogic/swift-nio.git", branch: "feat/khasmPAL-2026"),
+        .package(url: "https://github.com/PassiveLogic/async-kit.git", branch: "feat/khasmPAL-2026"),
+        // sqlite-nio and sql-kit keep their upstream URLs: khasm's ROOT manifest path-wires
+        // `../sqlite-nio` and `../sql-kit`, and a root path declaration wins those
+        // identities graph-wide.
         .package(url: "https://github.com/vapor/sqlite-nio.git", from: "1.9.0"),
         .package(url: "https://github.com/vapor/sql-kit.git", from: "3.29.3"),
-        .package(url: "https://github.com/vapor/async-kit.git", from: "1.19.0"),
     ],
     targets: [
         .target(
             name: "SQLiteKit",
             dependencies: [
-                // Target dependency conditions are evaluated per platform; on WASI these two
-                // products are not linked. AsyncKit's pool rides NIOPosix, which needs the POSIX
-                // sockets and threads WASI preview 1 lacks, and sqlite-nio's WASI flavor is
-                // SwiftNIO-free, so NIOFoundationCompat would have nothing to bridge and a linked
-                // NIOCore would flip the `#if canImport(NIOCore)` gates against a SQLiteNIO with no
-                // event loops. SQLiteKit then compiles without the connection pool and without the
-                // EventLoopFuture surface (see the `#if canImport(...)` gates in Sources/).
-                .product(name: "NIOFoundationCompat", package: "swift-nio", condition: .when(platforms: nonWASIPlatforms)),
-                .product(name: "AsyncKit", package: "async-kit", condition: .when(platforms: nonWASIPlatforms)),
+                // Target dependency conditions are evaluated per platform. Where these are not
+                // linked, AsyncKit's pool would have ridden NIOPosix, which needs the POSIX
+                // sockets and threads WASI preview 1 lacks, and NIOFoundationCompat would have no
+                // `ByteBuffer` to bridge, so SQLiteKit compiles without the connection pool and
+                // without the EventLoopFuture surface (see the `#if canImport(...)` gates in
+                // Sources/).
+                // DOWNSTREAM-ONLY: `nioPlatforms` excludes WASI only under KHASM_EMBEDDED=1
+                // (see the note at the top of this file). NIOPosix is listed explicitly because
+                // SQLiteConnectionSource imports it directly; on WASI it resolves as a partial
+                // module, so NIOAsyncRuntime supplies the thread pool there instead.
+                .product(name: "NIOFoundationCompat", package: "swift-nio", condition: .when(platforms: nioPlatforms)),
+                .product(name: "NIOPosix", package: "swift-nio", condition: .when(platforms: nioPlatforms)),
+                .product(name: "AsyncKit", package: "async-kit", condition: .when(platforms: nioPlatforms)),
                 .product(name: "SQLiteNIO", package: "sqlite-nio"),
                 .product(name: "SQLKit", package: "sql-kit"),
-            ],
+            ] + (khasmEmbedded ? [] : [
+                .product(name: "NIOAsyncRuntime", package: "swift-nio", condition: .when(platforms: wasiPlatform)),
+            ] as [Target.Dependency]),
             swiftSettings: swiftSettings
         ),
         .testTarget(

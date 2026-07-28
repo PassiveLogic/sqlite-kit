@@ -9,7 +9,19 @@ import Foundation
 #endif
 import Logging
 import AsyncKit
+// DOWNSTREAM-ONLY (integration/khasm-embedded): khasm's regular wasm flavor keeps SwiftNIO and
+// AsyncKit on WASI (see Package.swift), so this file compiles there too. Use NIOPosix on every
+// host platform and substitute the PL fork's NIOAsyncRuntime on WASI. Static `os(WASI)` is the
+// right gate — `canImport(NIOAsyncRuntime)` also matches on macOS/Linux when the module is in
+// the graph transitively (and its `AsyncThreadPool` is `@available(macOS 15, *)`, which breaks
+// older deployment targets), while `canImport(NIOPosix)` matches on WASI as a partial-module
+// stub that does not actually expose `NIOThreadPool`.
+#if os(WASI)
+import NIOAsyncRuntime
+public typealias NIOThreadPool = AsyncThreadPool
+#else
 import NIOPosix
+#endif
 import SQLiteNIO
 import NIOCore
 
@@ -20,7 +32,13 @@ public struct SQLiteConnectionSource: ConnectionPoolSource, Sendable {
     private let threadPool: NIOThreadPool
 
     private var connectionStorage: SQLiteConnection.Storage {
+        // DOWNSTREAM-ONLY: on WASI, file URLs/paths currently trap at runtime, so the wasm
+        // flavor is in-memory only.
+        #if os(WASI)
+        .memory
+        #else
         .file(path: self.actualURL.absoluteString)
+        #endif
     }
     
     /// Create a new ``SQLiteConnectionSource``.
