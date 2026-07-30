@@ -1,7 +1,9 @@
 import Foundation
 import SQLiteNIO
 @_spi(CodableUtilities) import SQLKit
+#if canImport(NIOFoundationCompat)
 import NIOFoundationCompat
+#endif
 
 /// Translates `SQLiteData` values received from the database into `Decodable` values.
 ///
@@ -51,7 +53,15 @@ public struct SQLiteDataDecoder: Sendable {
                 
                 switch data {
                 case .text(let str):  buf = .init(str.utf8)
+                // N.B.: `Data.init(buffer:byteTransferStrategy:)` is NIOFoundationCompat's
+                // zero-copy bridge and has no `[UInt8]` equivalent. The two cases stay forked
+                // rather than collapsing onto a copying spelling such as
+                // `Data(blob.readableBytesView)`, which would add a copy where SwiftNIO is present.
+                #if canImport(NIOFoundationCompat)
                 case .blob(let blob): buf = .init(buffer: blob, byteTransferStrategy: .noCopy)
+                #else
+                case .blob(let blob): buf = .init(blob)  // `SQLiteData.blob` carries `[UInt8]` without SwiftNIO
+                #endif
                 // The remaining cases should never happen, but we implement them anyway just in case.
                 case .integer(let n): buf = .init(String(n).utf8)
                 case .float(let n):   buf = .init(String(n).utf8)
