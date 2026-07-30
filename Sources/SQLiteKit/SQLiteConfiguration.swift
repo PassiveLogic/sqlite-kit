@@ -1,4 +1,6 @@
+#if canImport(Foundation)
 import struct Foundation.UUID
+#endif
 
 /// Describes a configuration for an SQLite database connection.
 public struct SQLiteConfiguration: Sendable {
@@ -8,7 +10,13 @@ public struct SQLiteConfiguration: Sendable {
         ///
         /// See ``memory(identifier:)``.
         public static var memory: Self {
+            #if canImport(Foundation)
             .memory(identifier: UUID().uuidString)
+            #else
+            // Foundation.UUID is unavailable in Embedded Swift; derive a unique identifier from
+            // system randomness instead.
+            .memory(identifier: "memory-\(UInt64.random(in: .min ... .max))")
+            #endif
         }
 
         /// Specify an SQLite database stored in memory, using a given identifier string.

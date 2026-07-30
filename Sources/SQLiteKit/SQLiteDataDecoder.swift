@@ -1,3 +1,17 @@
+#if hasFeature(Embedded)
+import SQLiteNIO
+
+/// Placeholder ``SQLiteDataDecoder`` for the Embedded Swift build.
+///
+/// `Decodable`-based row decoding, the only thing this type does elsewhere, is unavailable in
+/// Embedded Swift, where `SQLKit/SQLRow` exposes no generic `decode(column:as:)`. Typed access is
+/// performed directly against the concrete `SQLiteRow` via `SQLiteDataConvertible` there. This stub
+/// exists only so the ``SQLiteDataDecoder`` API surface (e.g. `sql(decoder:)`) stays uniform.
+public struct SQLiteDataDecoder: Sendable {
+    /// Initialize a ``SQLiteDataDecoder``.
+    public init() {}
+}
+#else
 import Foundation
 import SQLiteNIO
 @_spi(CodableUtilities) import SQLKit
@@ -119,3 +133,4 @@ public struct SQLiteDataDecoder: Sendable {
         }
     }
 }
+#endif  // hasFeature(Embedded)
