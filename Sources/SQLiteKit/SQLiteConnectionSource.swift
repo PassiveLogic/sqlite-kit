@@ -30,9 +30,19 @@ public struct SQLiteConnectionSource: ConnectionPoolSource, Sendable {
 
     private var connectionStorage: SQLiteConnection.Storage {
         #if os(WASI)
-        // NOTE: For WASI platforms, file urls and paths cause runtime errors currently. Using
-        // in-memory connection only as a workaround.
-        .memory
+        // On WASI, pass the configured storage through directly:
+        // - `.file` works (sqlite over a preopened directory); pass the raw
+        //   configured path rather than routing through `urlForSQLite`.
+        // - `.memory` stays a true in-memory database. The temp-file emulation
+        //   of shared in-memory databases (see `urlForSQLite` below) requires a
+        //   usable temporary directory, which WASI hosts do not generally
+        //   preopen.
+        switch self.configuration.storage {
+        case .memory:
+            .memory
+        case .file(let path):
+            .file(path: path)
+        }
         #else
         .file(path: self.actualURL.absoluteString)
         #endif
