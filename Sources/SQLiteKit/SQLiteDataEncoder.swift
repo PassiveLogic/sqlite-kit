@@ -31,6 +31,13 @@ public struct SQLiteDataEncoder: Sendable {
     /// - Parameter value: The value to convert.
     /// - Returns: A converted `SQLiteData` value, if successful.
     public func encode(_ value: any Encodable) throws -> SQLiteData {
+        // perf (drop-in load experiment E5b, khasm#349): sql-kit wraps each bound value in
+        // `FakeSendableCodable`, which hides the `SQLiteDataConvertible` fast path behind a failed
+        // cast and a nested single-value encoder. Unwrap it first.
+        if let wrapped = value as? any _FakeSendableUnwrapping,
+           let data = (wrapped._unwrappedValue as? any SQLiteDataConvertible)?.sqliteData {
+            return data
+        }
         if let data = (value as? any SQLiteDataConvertible)?.sqliteData {
             return data
         } else {
@@ -174,4 +181,14 @@ public struct SQLiteDataEncoder: Sendable {
             self.value = try self.dataEncoder.encode(value)
         }
     }
+}
+
+/// perf (drop-in load experiment E5b): lets ``SQLiteDataEncoder`` reach the value inside sql-kit's
+/// `FakeSendableCodable` without knowing its generic parameter.
+protocol _FakeSendableUnwrapping {
+    var _unwrappedValue: Any { get }
+}
+
+extension FakeSendableCodable: _FakeSendableUnwrapping {
+    var _unwrappedValue: Any { self.value }
 }
