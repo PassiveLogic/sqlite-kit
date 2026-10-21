@@ -11,6 +11,9 @@ public struct SQLiteDataEncoder: Sendable {
     /// A wrapper to silence `Sendable` warnings for `JSONEncoder` when not on macOS.
     struct FakeSendable<T>: @unchecked Sendable { let value: T }
     
+    /// Whether another module conforms `UUID` to `SQLiteDataConvertible`; ``encode(_:)`` then skips its UUID checks.
+    static let uuidIsSQLiteDataConvertible = UUID.self is any SQLiteDataConvertible.Type
+
     /// The `JSONEncoder` used for encoding values that can't be directly converted.
     let json: FakeSendable<JSONEncoder>
     
@@ -31,7 +34,14 @@ public struct SQLiteDataEncoder: Sendable {
     /// - Parameter value: The value to convert.
     /// - Returns: A converted `SQLiteData` value, if successful.
     public func encode(_ value: any Encodable) throws -> SQLiteData {
-        if let data = (value as? any SQLiteDataConvertible)?.sqliteData {
+        // UUIDs (bare or wrapped by sql-kit) use concrete casts, which are cheaper than the protocol casts below.
+        if !Self.uuidIsSQLiteDataConvertible, let wrapped = value as? FakeSendableCodable<UUID> {
+            return .text(wrapped.value.uuidString)
+        } else if !Self.uuidIsSQLiteDataConvertible, let uuid = value as? UUID {
+            return .text(uuid.uuidString)
+        } else if let data = (value as? any SQLiteDataConvertible)?.sqliteData {
+            return data
+        } else if let data = (value as? any WrappedSQLiteDataConvertible)?.wrappedSQLiteData {
             return data
         } else {
             let encoder = NestedSingleValueUnwrappingEncoder(dataEncoder: self)
@@ -174,4 +184,13 @@ public struct SQLiteDataEncoder: Sendable {
             self.value = try self.dataEncoder.encode(value)
         }
     }
+}
+
+/// Converts an `SQLiteDataConvertible` value wrapped in sql-kit's `FakeSendableCodable` without a nested encoder.
+protocol WrappedSQLiteDataConvertible {
+    var wrappedSQLiteData: SQLiteData? { get }
+}
+
+extension FakeSendableCodable: WrappedSQLiteDataConvertible where T: SQLiteDataConvertible {
+    var wrappedSQLiteData: SQLiteData? { self.value.sqliteData }
 }

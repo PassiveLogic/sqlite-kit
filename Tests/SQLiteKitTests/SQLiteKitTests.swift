@@ -3,7 +3,7 @@ import SQLiteKit
 import SQLKitBenchmark
 import XCTest
 import SQLiteNIO
-import SQLKit
+@_spi(CodableUtilities) import SQLKit
 
 final class SQLiteKitTests: XCTestCase {
     func testSQLKitBenchmark() async throws {
@@ -241,6 +241,22 @@ final class SQLiteKitTests: XCTestCase {
         }
         let foo = Foo(bar: ["a", "b", "c"])
         _ = try SQLiteDataEncoder().encode(foo)
+    }
+
+    func testEncodeBareAndWrappedValues() throws {
+        let encoder = SQLiteDataEncoder()
+        let uuid = UUID()
+
+        XCTAssertEqual(try encoder.encode(uuid), .text(uuid.uuidString))
+        XCTAssertEqual(try encoder.encode(FakeSendableCodable(uuid)), .text(uuid.uuidString))
+        XCTAssertEqual(try encoder.encode("a"), .text("a"))
+        XCTAssertEqual(try encoder.encode(FakeSendableCodable("a")), .text("a"))
+        XCTAssertEqual(try encoder.encode(1), .integer(1))
+        XCTAssertEqual(try encoder.encode(FakeSendableCodable(1)), .integer(1))
+        XCTAssertEqual(try encoder.encode(1.5), .float(1.5))
+        XCTAssertEqual(try encoder.encode(FakeSendableCodable(1.5)), .float(1.5))
+        XCTAssertEqual(try encoder.encode(String?.none), .null)
+        XCTAssertEqual(try encoder.encode(FakeSendableCodable(String?.none)), .null)
     }
 
     var db: any SQLDatabase { self.connection.sql() }
