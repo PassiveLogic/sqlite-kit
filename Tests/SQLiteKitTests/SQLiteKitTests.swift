@@ -259,6 +259,30 @@ final class SQLiteKitTests: XCTestCase {
         XCTAssertEqual(try encoder.encode(FakeSendableCodable(String?.none)), .null)
     }
 
+    func testDecodeCommonColumnTypes() throws {
+        let decoder = SQLiteDataDecoder()
+        let uuid = UUID()
+
+        XCTAssertEqual(try decoder.decode(UUID.self, from: .text(uuid.uuidString)), uuid)
+        XCTAssertEqual(try decoder.decode(UUID.self, from: .text(uuid.uuidString.lowercased())), uuid)
+        XCTAssertEqual(try decoder.decode(UUID?.self, from: .text(uuid.uuidString)), uuid)
+        XCTAssertEqual(try decoder.decode(UUID?.self, from: .null), nil)
+        XCTAssertEqual(try decoder.decode(String?.self, from: .text("a")), "a")
+        XCTAssertEqual(try decoder.decode(String?.self, from: .null), nil)
+        XCTAssertEqual(try decoder.decode(Bool.self, from: .integer(1)), true)
+        XCTAssertEqual(try decoder.decode(Bool?.self, from: .integer(0)), false)
+        XCTAssertEqual(try decoder.decode(Bool?.self, from: .null), nil)
+        XCTAssertEqual(try decoder.decode(Double?.self, from: .float(1.5)), 1.5)
+        XCTAssertEqual(try decoder.decode(Double?.self, from: .null), nil)
+        XCTAssertEqual(try decoder.decode(Int?.self, from: .integer(42)), 42)
+        XCTAssertEqual(try decoder.decode(Int?.self, from: .null), nil)
+
+        XCTAssertThrowsError(try decoder.decode(UUID.self, from: .text("not a uuid")))
+        XCTAssertThrowsError(try decoder.decode(UUID?.self, from: .text("not a uuid")))
+        XCTAssertThrowsError(try decoder.decode(UUID.self, from: .null))
+        XCTAssertThrowsError(try decoder.decode(Bool.self, from: .null))
+    }
+
     var db: any SQLDatabase { self.connection.sql() }
     var connection: SQLiteConnection!
 

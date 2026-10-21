@@ -11,6 +11,12 @@ public struct SQLiteDataDecoder: Sendable {
     /// A wrapper to silence `Sendable` warnings for `JSONDecoder` when not on macOS.
     struct FakeSendable<T>: @unchecked Sendable { let value: T }
     
+    /// Whether another module conforms `UUID` or an optional to `SQLiteDataConvertible`, which turns off the checks.
+    static let anyIdentityCheckedTypeIsSQLiteDataConvertible: Bool = {
+        let types: [Any.Type] = [UUID.self, UUID?.self, String?.self, Bool?.self, Double?.self, Int?.self]
+        return types.contains { $0 is any SQLiteDataConvertible.Type }
+    }()
+
     /// The `JSONDecoder` used for decoding values that can't be directly converted.
     let json: FakeSendable<JSONDecoder>
 
@@ -33,6 +39,30 @@ public struct SQLiteDataDecoder: Sendable {
     ///   - data: The data to decode.
     /// - Returns: The decoded value, if successful.
     public func decode<T: Decodable>(_ type: T.Type, from data: SQLiteData) throws -> T {
+        // Match common types by identity before the protocol cast; whatever they cannot convert falls through.
+        if !Self.anyIdentityCheckedTypeIsSQLiteDataConvertible {
+            if T.self == UUID?.self {
+                if data.isNull { return UUID?.none as! T }
+                if case .text(let text) = data, let uuid = UUID(uuidString: text) { return UUID?.some(uuid) as! T }
+            } else if T.self == String?.self {
+                if data.isNull { return String?.none as! T }
+                if let string = String(sqliteData: data) { return String?.some(string) as! T }
+            } else if T.self == UUID.self {
+                if case .text(let text) = data, let uuid = UUID(uuidString: text) { return uuid as! T }
+            } else if T.self == Bool?.self {
+                if data.isNull { return Bool?.none as! T }
+                if let bool = Bool(sqliteData: data) { return Bool?.some(bool) as! T }
+            } else if T.self == Double?.self {
+                if data.isNull { return Double?.none as! T }
+                if let double = Double(sqliteData: data) { return Double?.some(double) as! T }
+            } else if T.self == Bool.self {
+                if let bool = Bool(sqliteData: data) { return bool as! T }
+            } else if T.self == Int?.self {
+                if data.isNull { return Int?.none as! T }
+                if let int = Int(sqliteData: data) { return Int?.some(int) as! T }
+            }
+        }
+
         // If `T` can be converted directly, just do so.
         if let type = type as? any SQLiteDataConvertible.Type {
             guard let value = type.init(sqliteData: data) else {
